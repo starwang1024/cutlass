@@ -1,6 +1,7 @@
 // nvcc -std=c++17 -O3 -DNDEBUG igemm_sm75.cu -Icutlass/include -Icutlass/tools/util/include -Icutlass/examples/common -lcudart -arch=sm_75
 // Problem size: 64x40960x1024
 // CUTE_GEMM:     [10723.4]GFlop/s [ 104.9]GB/s  (0.5007)ms
+// CUTE_GEMM:     [12901.8]GFlop/s [ 126.2]GB/s  (0.4161)ms
 
 #include <iostream>  
 #include <cutlass/cutlass.h>  
@@ -74,8 +75,17 @@ int main(int argc, char** argv) {
 
     using MMA = decltype(make_tiled_mma(mma_atom{}, MMA_EU_RepeatT{}, MMA_P_T{}));
 
-    using SmemLayoutAtom = Layout<Shape <_64, Shape <_4,  _8>>,  
-                                    Stride<  _4, Stride<_1,_256>>>;  
+    using SmemLayoutAtom = decltype(composition(
+        Swizzle<2, 4, 3>{},
+        make_layout(make_shape(Int<8>{}, Int<kTileK>{}),
+                    make_stride(Int<kTileK>{}, Int<1>{}))));
+    using SmemLayoutA = decltype(
+        tile_to_shape(SmemLayoutAtom{},
+                        make_shape(Int<kTileM>{}, Int<kTileK>{})));
+    using SmemLayoutB = decltype(
+        tile_to_shape(SmemLayoutAtom{},
+                        make_shape(Int<kTileN>{}, Int<kTileK>{})));
+
     using SmemCopyAtom = Copy_Atom<DefaultCopy, ElementA>;
     using SmemCopyAtomA = SmemCopyAtom;
     using SmemCopyAtomB = SmemCopyAtom;
