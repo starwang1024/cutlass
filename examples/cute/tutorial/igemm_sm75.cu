@@ -2,6 +2,7 @@
 // Problem size: 64x40960x1024
 // CUTE_GEMM:     [10723.4]GFlop/s [ 104.9]GB/s  (0.5007)ms
 // CUTE_GEMM:     [12901.8]GFlop/s [ 126.2]GB/s  (0.4161)ms
+// CUTE_GEMM:     [12907.7]GFlop/s [ 126.2]GB/s  (0.4159)ms
 
 #include <iostream>  
 #include <cutlass/cutlass.h>  
@@ -86,9 +87,12 @@ int main(int argc, char** argv) {
         tile_to_shape(SmemLayoutAtom{},
                         make_shape(Int<kTileN>{}, Int<kTileK>{})));
 
-    using SmemCopyAtom = Copy_Atom<DefaultCopy, ElementA>;
-    using SmemCopyAtomA = SmemCopyAtom;
-    using SmemCopyAtomB = SmemCopyAtom;
+    using s2r_copy_op = SM75_U32x1_LDSM_N;
+    using s2r_copy_traits = Copy_Traits<s2r_copy_op>;
+    using s2r_copy_atom = Copy_Atom<s2r_copy_traits, uint8_t>;
+
+    using SmemCopyAtomA = s2r_copy_atom;
+    using SmemCopyAtomB = s2r_copy_atom;
 
     using GmemTiledCopy = decltype(  
         make_tiled_copy(Copy_Atom<UniversalCopy<cute::uint128_t>, ElementA>{},  
