@@ -3,6 +3,7 @@
 // CUTE_GEMM:     [10723.4]GFlop/s [ 104.9]GB/s  (0.5007)ms
 // CUTE_GEMM:     [12901.8]GFlop/s [ 126.2]GB/s  (0.4161)ms
 // CUTE_GEMM:     [12907.7]GFlop/s [ 126.2]GB/s  (0.4159)ms
+// CUTE_GEMM:     [14558.4]GFlop/s [ 142.3]GB/s  (0.3688)ms
 
 #include <iostream>  
 #include <cutlass/cutlass.h>  
@@ -10,7 +11,8 @@
 #include <cutlass/gemm/gemm.h>  
 #include <cutlass/gemm/dispatch_policy.hpp>  
 #include <cutlass/gemm/collective/collective_builder.hpp>  
-#include <cutlass/epilogue/collective/default_epilogue.hpp>  
+#include <cutlass/epilogue/collective/default_epilogue.hpp>
+#include <cutlass/epilogue/collective/sm70_epilogue_vectorized.hpp>
 #include <cutlass/gemm/kernel/gemm_universal.h>  
 #include <cutlass/gemm/device/gemm_universal_adapter.h>  
 #include <cutlass/layout/matrix.h>  
@@ -66,8 +68,8 @@ int main(int argc, char** argv) {
     static constexpr int kMmaEURepeatK = 1;
 
     using mma_atom_shape = mma_traits::Shape_MNK;
-    static constexpr int kMmaPM = 1 * kMmaEURepeatM * get<0>(mma_atom_shape{});
-    static constexpr int kMmaPN = 1 * kMmaEURepeatN * get<1>(mma_atom_shape{});
+    static constexpr int kMmaPM = 2 * kMmaEURepeatM * get<0>(mma_atom_shape{});
+    static constexpr int kMmaPN = 2 * kMmaEURepeatN * get<1>(mma_atom_shape{});
     static constexpr int kMmaPK = 1 * kMmaEURepeatK * get<2>(mma_atom_shape{});
 
     using MMA_EU_RepeatT = decltype(make_layout(make_shape(
@@ -87,7 +89,7 @@ int main(int argc, char** argv) {
         tile_to_shape(SmemLayoutAtom{},
                         make_shape(Int<kTileN>{}, Int<kTileK>{})));
 
-    using s2r_copy_op = SM75_U32x1_LDSM_N;
+    using s2r_copy_op = SM75_U32x2_LDSM_N;
     using s2r_copy_traits = Copy_Traits<s2r_copy_op>;
     using s2r_copy_atom = Copy_Atom<s2r_copy_traits, uint8_t>;
 
@@ -112,12 +114,25 @@ int main(int argc, char** argv) {
         GmemTiledCopyB, SmemLayoutAtom, SmemCopyAtomB, cute::identity  
     >;  
   
-    using CollectiveEpilogue = epilogue::collective::DefaultEpilogue<  
-        int32_t,  
-        TagToStrideC_t<LayoutC>,  
-        TagToStrideC_t<LayoutC>,  
-        epilogue::thread::LinearCombination<int32_t, 1, int32_t, int32_t>,  
-        cutlass::gemm::EpilogueDefault>;  
+    using SmemLayoutCAtom = decltype(composition(
+        Swizzle<3, 2, 3>{},
+        make_layout(make_shape(Int<8>{}, Int<kTileN>{}),
+                    make_stride(Int<kTileN>{}, Int<1>{}))));
+    using SmemLayoutC = decltype(
+        tile_to_shape(SmemLayoutCAtom{},
+                        make_shape(Int<kTileM>{}, Int<kTileN>{})));
+
+    using CollectiveEpilogue = epilogue::collective::Epilogue<
+        TagToStrideC_t<LayoutC>, TagToStrideC_t<LayoutC>,
+        epilogue::thread::LinearCombination<int32_t, 1, int32_t, int32_t>,
+        SmemLayoutC,
+        Copy_Atom<UniversalCopy<uint32_t>, int32_t>,                           // R2S with tiled_mma layout
+        decltype(make_tiled_copy(Copy_Atom<UniversalCopy<int32_t>,int32_t>{}, // S2R
+                                Layout<Shape <_32,_4>,
+                                        Stride< _4,_1>>{},
+                                Layout<Shape<_1,_4>>{})),
+        Copy_Atom<UniversalCopy<uint128_t>,int32_t>                           // R2G with S2R_dst layout
+        >;
   
     using GemmKernel = cutlass::gemm::kernel::GemmUniversal<  
       Shape<int,int,int>,  
