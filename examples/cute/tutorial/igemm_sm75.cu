@@ -1,9 +1,10 @@
-// nvcc -std=c++17 -O3 -DNDEBUG igemm_sm75.cu -Icutlass/include -Icutlass/tools/util/include -Icutlass/examples/common -lcudart -arch=sm_75
+// nvcc -std=c++17 -O3 -DNDEBUG igemm_sm75.cu -Icutlass/include -Icutlass/tools/util/include -Icutlass/examples/common -lcudart -lcublas -lcublasLt -arch=sm_75
 // Problem size: 64x40960x1024
 // CUTE_GEMM:     [10723.4]GFlop/s [ 104.9]GB/s  (0.5007)ms
 // CUTE_GEMM:     [12901.8]GFlop/s [ 126.2]GB/s  (0.4161)ms
 // CUTE_GEMM:     [12907.7]GFlop/s [ 126.2]GB/s  (0.4159)ms
 // CUTE_GEMM:     [14558.4]GFlop/s [ 142.3]GB/s  (0.3688)ms
+// CUBLAS_GEMM:   [19317.2]GFlop/s [ 188.9]GB/s  (0.2779)ms
 
 #include <iostream>  
 #include <cutlass/cutlass.h>  
@@ -22,11 +23,12 @@
 #include <cutlass/util/reference/host/tensor_compare.h>
 #include <cutlass/util/reference/host/tensor_copy.h>
 #include "cutlass/util/GPU_Clock.hpp"
-  
+#include "cublasLt_gemm.h"
+
 using namespace cute;  
 using namespace cutlass;  
 using namespace cutlass::gemm;  
- 
+
 int main(int argc, char** argv) {
 
     int m = 512;
@@ -195,7 +197,7 @@ int main(int argc, char** argv) {
         cutlass::gemm::GemmUniversalMode::kGemm,  // 替换GemmCoord为GemmUniversalMode
         {m, n, k},  // 问题尺寸
         {tensor_A.device_data(), a_stride, tensor_B.device_data(), b_stride},
-        {{static_cast<ElementAccumulator>(alpha), static_cast<ElementAccumulator>(beta)}, tensor_C.device_data(), c_stride, tensor_D.device_data(), c_stride}, 
+        {{static_cast<ElementAccumulator>(alpha), static_cast<ElementAccumulator>(beta)}, tensor_D.device_data(), c_stride, tensor_D.device_data(), c_stride}, 
     };
   
     // 初始化GEMM操作  
@@ -287,5 +289,22 @@ int main(int argc, char** argv) {
     }
     float cute_time = timer.seconds() / timing_iterations;
     printf("CUTE_GEMM:     [%6.1f]GFlop/s [%6.1f]GB/s  (%6.4f)ms\n", gflops / cute_time, gBs / cute_time, cute_time*1000);
+
+    CublasLtGemm<int8_t, int32_t> cublas_gemm;
+    cublas_gemm.init(tensor_C.device_data(), tensor_A.device_data(), tensor_B.device_data(), m, n, k);
+
+    timer.start();
+    for (int i = 0; i < timing_warmup_iterations; ++i) {
+        cublas_gemm.run();
+    }
+    timer.seconds();
+
+    timer.start();
+    for (int i = 0; i < timing_iterations; ++i) {
+        cublas_gemm.run();
+    }
+    float cublaslt_time = timer.seconds() / timing_iterations;
+    printf("CUBLAS_GEMM:   [%6.1f]GFlop/s [%6.1f]GB/s  (%6.4f)ms\n", gflops / cublaslt_time, gBs / cublaslt_time, cublaslt_time*1000);
+
     return 0;  
 }
