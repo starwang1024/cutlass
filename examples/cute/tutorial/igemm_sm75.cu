@@ -4,6 +4,7 @@
 // CUTE_GEMM:     [12901.8]GFlop/s [ 126.2]GB/s  (0.4161)ms
 // CUTE_GEMM:     [12907.7]GFlop/s [ 126.2]GB/s  (0.4159)ms
 // CUTE_GEMM:     [14558.4]GFlop/s [ 142.3]GB/s  (0.3688)ms
+// CUTE_GEMM:     [16167.5]GFlop/s [ 158.1]GB/s  (0.3321)ms
 // CUBLAS_GEMM:   [19317.2]GFlop/s [ 188.9]GB/s  (0.2779)ms
 
 #include <iostream>  
@@ -44,8 +45,8 @@ int main(int argc, char** argv) {
         sscanf(argv[3], "%d", &k);
 
     static constexpr int kTileM = 64;
-    static constexpr int kTileN = 64;
-    static constexpr int kTileK = 32;
+    static constexpr int kTileN = 128;
+    static constexpr int kTileK = 64;
 
     using DispatchPolicy = MainloopSm70TwoStageUnpredicated;
     using ElementA = int8_t;  
@@ -65,8 +66,8 @@ int main(int argc, char** argv) {
     using mma_traits = MMA_Traits<mma_op>;
     using mma_atom = MMA_Atom<mma_traits>;
 
-    static constexpr int kMmaEURepeatM = 2;
-    static constexpr int kMmaEURepeatN = 2;
+    static constexpr int kMmaEURepeatM = 1;
+    static constexpr int kMmaEURepeatN = 4;
     static constexpr int kMmaEURepeatK = 1;
 
     using mma_atom_shape = mma_traits::Shape_MNK;
