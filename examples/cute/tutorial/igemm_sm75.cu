@@ -6,6 +6,7 @@
 // CUTE_GEMM:     [14558.4]GFlop/s [ 142.3]GB/s  (0.3688)ms
 // CUTE_GEMM:     [16167.5]GFlop/s [ 158.1]GB/s  (0.3321)ms
 // CUTE_GEMM:     [18525.6]GFlop/s [ 181.1]GB/s  (0.2898)ms
+// CUTE_GEMM:     [19115.0]GFlop/s [ 186.9]GB/s  (0.2809)ms
 // CUBLAS_GEMM:   [19317.2]GFlop/s [ 188.9]GB/s  (0.2779)ms
 
 #include <iostream>  
@@ -72,8 +73,8 @@ int main(int argc, char** argv) {
     static constexpr int kMmaEURepeatK = 1;
 
     using mma_atom_shape = mma_traits::Shape_MNK;
-    static constexpr int kMmaPM = 2 * kMmaEURepeatM * get<0>(mma_atom_shape{});
-    static constexpr int kMmaPN = 2 * kMmaEURepeatN * get<1>(mma_atom_shape{});
+    static constexpr int kMmaPM = 4 * kMmaEURepeatM * get<0>(mma_atom_shape{});
+    static constexpr int kMmaPN = 4 * kMmaEURepeatN * get<1>(mma_atom_shape{});
     static constexpr int kMmaPK = 1 * kMmaEURepeatK * get<2>(mma_atom_shape{});
 
     using MMA_EU_RepeatT = decltype(make_layout(make_shape(
@@ -91,12 +92,16 @@ int main(int argc, char** argv) {
         make_layout(make_shape(Int<8>{}, Int<kTileK>{}),
                     make_stride(Int<kTileK>{}, Int<1>{}))));
 
-    using s2r_copy_op = SM75_U32x2_LDSM_N;
-    using s2r_copy_traits = Copy_Traits<s2r_copy_op>;
-    using s2r_copy_atom = Copy_Atom<s2r_copy_traits, uint8_t>;
+    using s2r_copy_op_a = SM75_U32x4_LDSM_N;
+    using s2r_copy_traits_a = Copy_Traits<s2r_copy_op_a>;
+    using s2r_copy_atom_a = Copy_Atom<s2r_copy_traits_a, uint8_t>;
 
-    using SmemCopyAtomA = s2r_copy_atom;
-    using SmemCopyAtomB = s2r_copy_atom;
+    using s2r_copy_op_b = SM75_U32x4_LDSM_N;
+    using s2r_copy_traits_b = Copy_Traits<s2r_copy_op_b>;
+    using s2r_copy_atom_b = Copy_Atom<s2r_copy_traits_b, uint8_t>;
+
+    using SmemCopyAtomA = s2r_copy_atom_a;
+    using SmemCopyAtomB = s2r_copy_atom_b;
 
     using GmemTiledCopy = decltype(  
         make_tiled_copy(Copy_Atom<UniversalCopy<cute::uint128_t>, ElementA>{},  
