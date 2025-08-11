@@ -5,6 +5,7 @@
 // CUTE_GEMM:     [12907.7]GFlop/s [ 126.2]GB/s  (0.4159)ms
 // CUTE_GEMM:     [14558.4]GFlop/s [ 142.3]GB/s  (0.3688)ms
 // CUTE_GEMM:     [16167.5]GFlop/s [ 158.1]GB/s  (0.3321)ms
+// CUTE_GEMM:     [18525.6]GFlop/s [ 181.1]GB/s  (0.2898)ms
 // CUBLAS_GEMM:   [19317.2]GFlop/s [ 188.9]GB/s  (0.2779)ms
 
 #include <iostream>  
@@ -44,9 +45,9 @@ int main(int argc, char** argv) {
     if (argc >= 4)
         sscanf(argv[3], "%d", &k);
 
-    static constexpr int kTileM = 64;
+    static constexpr int kTileM = 32;
     static constexpr int kTileN = 128;
-    static constexpr int kTileK = 64;
+    static constexpr int kTileK = 128;
 
     using DispatchPolicy = MainloopSm70TwoStageUnpredicated;
     using ElementA = int8_t;  
@@ -81,16 +82,14 @@ int main(int argc, char** argv) {
 
     using MMA = decltype(make_tiled_mma(mma_atom{}, MMA_EU_RepeatT{}, MMA_P_T{}));
 
-    using SmemLayoutAtom = decltype(composition(
+    using SmemLayoutAtomA = decltype(composition(
         Swizzle<2, 4, 3>{},
         make_layout(make_shape(Int<8>{}, Int<kTileK>{}),
                     make_stride(Int<kTileK>{}, Int<1>{}))));
-    using SmemLayoutA = decltype(
-        tile_to_shape(SmemLayoutAtom{},
-                        make_shape(Int<kTileM>{}, Int<kTileK>{})));
-    using SmemLayoutB = decltype(
-        tile_to_shape(SmemLayoutAtom{},
-                        make_shape(Int<kTileN>{}, Int<kTileK>{})));
+    using SmemLayoutAtomB = decltype(composition(
+        Swizzle<2, 4, 3>{},
+        make_layout(make_shape(Int<8>{}, Int<kTileK>{}),
+                    make_stride(Int<kTileK>{}, Int<1>{}))));
 
     using s2r_copy_op = SM75_U32x2_LDSM_N;
     using s2r_copy_traits = Copy_Traits<s2r_copy_op>;
@@ -113,8 +112,8 @@ int main(int argc, char** argv) {
         ElementA, TagToStrideA_t<LayoutA>,  
         ElementB, TagToStrideB_t<LayoutB>,  
         MMA,  
-        GmemTiledCopyA, SmemLayoutAtom, SmemCopyAtomA, cute::identity,  
-        GmemTiledCopyB, SmemLayoutAtom, SmemCopyAtomB, cute::identity  
+        GmemTiledCopyA, SmemLayoutAtomA, SmemCopyAtomA, cute::identity,  
+        GmemTiledCopyB, SmemLayoutAtomB, SmemCopyAtomB, cute::identity  
     >;  
   
     using SmemLayoutCAtom = decltype(composition(
