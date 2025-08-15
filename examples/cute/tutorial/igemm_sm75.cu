@@ -8,6 +8,7 @@
 // CUTE_GEMM:     [18525.6]GFlop/s [ 181.1]GB/s  (0.2898)ms
 // CUTE_GEMM:     [19115.0]GFlop/s [ 186.9]GB/s  (0.2809)ms
 // CUTE_GEMM:     [20064.9]GFlop/s [ 196.2]GB/s  (0.2676)ms
+// CUTE_GEMM:     [20184.4]GFlop/s [ 197.4]GB/s  (0.2660)ms
 // CUBLAS_GEMM:   [19984.0]GFlop/s [ 195.4]GB/s  (0.2687)ms
 
 #include <iostream>  
@@ -85,11 +86,11 @@ int main(int argc, char** argv) {
     using MMA = decltype(make_tiled_mma(mma_atom{}, MMA_EU_RepeatT{}, MMA_P_T{}));
 
     using SmemLayoutAtomA = decltype(composition(
-        Swizzle<2, 4, 3>{},
+        Swizzle<3, 4, 3>{},
         make_layout(make_shape(Int<8>{}, Int<kTileK>{}),
                     make_stride(Int<kTileK>{}, Int<1>{}))));
     using SmemLayoutAtomB = decltype(composition(
-        Swizzle<2, 4, 3>{},
+        Swizzle<3, 4, 3>{},
         make_layout(make_shape(Int<8>{}, Int<kTileK>{}),
                     make_stride(Int<kTileK>{}, Int<1>{}))));
 
