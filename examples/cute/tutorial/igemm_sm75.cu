@@ -7,7 +7,8 @@
 // CUTE_GEMM:     [16167.5]GFlop/s [ 158.1]GB/s  (0.3321)ms
 // CUTE_GEMM:     [18525.6]GFlop/s [ 181.1]GB/s  (0.2898)ms
 // CUTE_GEMM:     [19115.0]GFlop/s [ 186.9]GB/s  (0.2809)ms
-// CUBLAS_GEMM:   [19317.2]GFlop/s [ 188.9]GB/s  (0.2779)ms
+// CUTE_GEMM:     [20064.9]GFlop/s [ 196.2]GB/s  (0.2676)ms
+// CUBLAS_GEMM:   [19984.0]GFlop/s [ 195.4]GB/s  (0.2687)ms
 
 #include <iostream>  
 #include <cutlass/cutlass.h>  
@@ -105,9 +106,9 @@ int main(int argc, char** argv) {
 
     using GmemTiledCopy = decltype(  
         make_tiled_copy(Copy_Atom<UniversalCopy<cute::uint128_t>, ElementA>{},  
-                        Layout<Shape <_32,_4>,  
-                            Stride< _4,_1>>{},  
-                        Layout<Shape < _1,_16>>{}));  
+                        Layout<Shape <_16,_8>,
+                            Stride< _8,_1>>{},
+                        Layout<Shape < _1,_16>>{}));
  
     using GmemTiledCopyA = GmemTiledCopy;
     using GmemTiledCopyB = GmemTiledCopy;
@@ -135,8 +136,8 @@ int main(int argc, char** argv) {
         SmemLayoutC,
         Copy_Atom<UniversalCopy<uint32_t>, int32_t>,                           // R2S with tiled_mma layout
         decltype(make_tiled_copy(Copy_Atom<UniversalCopy<int32_t>,int32_t>{}, // S2R
-                                Layout<Shape <_32,_4>,
-                                        Stride< _4,_1>>{},
+                                Layout<Shape <_16,_8>,
+                                        Stride< _8,_1>>{},
                                 Layout<Shape<_1,_4>>{})),
         Copy_Atom<UniversalCopy<uint128_t>,int32_t>                           // R2G with S2R_dst layout
         >;
