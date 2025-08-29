@@ -67,9 +67,6 @@ int main(int argc, char** argv) {
     using mma_traits = MMA_Traits<mma_op>;
     using mma_atom = MMA_Atom<mma_traits>;
 
-    using mma_traits = MMA_Traits<mma_op>;
-    using mma_atom = MMA_Atom<mma_traits>;
-
     static constexpr int kMmaEURepeatM = 1;
     static constexpr int kMmaEURepeatN = 4;
     static constexpr int kMmaEURepeatK = 1;
